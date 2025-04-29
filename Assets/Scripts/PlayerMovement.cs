@@ -15,7 +15,7 @@ public class PlayerController : MonoBehaviour
 
 
 
-
+    [SerializeField] private Transform hitBoxPosition;
     private Rigidbody rb;
 
     void Start()
@@ -59,17 +59,24 @@ public class PlayerController : MonoBehaviour
 
     void Attack()
     {
-        Debug.Log("enta ataque");
+        Debug.Log("entra ataque");
         animator.Play("Attack");
-        RaycastHit hit;
-        if (Physics.Raycast(transform.position, transform.forward, out hit, 2f))
+        
+        Collider[] colliders = Physics.OverlapSphere(hitBoxPosition.position, 3);
+        if (colliders != null)
         {
-            if (hit.collider.CompareTag("Boss"))
+            foreach (Collider collider in colliders)
             {
-                hit.collider.GetComponent<Health>().TakeDamage(20);
+                if (collider.CompareTag("Boss"))
+                {
+                    collider.GetComponent<Health>().TakeDamage(20);
+                }
             }
+            
         }
     }
+
+
 
     void Dodge()
     {
