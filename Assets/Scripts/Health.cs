@@ -4,10 +4,12 @@ public class Health : MonoBehaviour
 {
     public int maxHealth = 100;
     private int currentHealth;
+    private Animator animator;
 
     void Start()
     {
         currentHealth = maxHealth;
+        animator = GetComponent<Animator>();
     }
 
     public void TakeDamage(int amount)
@@ -24,6 +26,11 @@ public class Health : MonoBehaviour
     void Die()
     {
         Debug.Log(gameObject.name + " died!");
-        Destroy(gameObject);
+        animator.SetTrigger("IsDead");
+        Destroy(gameObject,10);
+    }
+    public int getCurrentHealth()
+    {
+        return currentHealth;
     }
 }

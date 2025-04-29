@@ -26,6 +26,7 @@ public class BossAI_NavMesh : MonoBehaviour
 
     private Animator animator;
     private NavMeshAgent agent;
+    private Health health;
 
     // Cooldowns
     public float cooldownAtaqueBasico = 2f;
@@ -39,6 +40,7 @@ public class BossAI_NavMesh : MonoBehaviour
         animator = GetComponent<Animator>();
         agent = GetComponent<NavMeshAgent>();
         jugador = GameObject.FindGameObjectWithTag("Player").transform;
+        health = GetComponent<Health>();
 
         ActivarAnimacionPatrullar();
         agent.speed = velocidadPatrulla;
@@ -47,6 +49,10 @@ public class BossAI_NavMesh : MonoBehaviour
 
     void Update()
     {
+        if(health.getCurrentHealth()<=0)
+        {
+         return;
+        }
         switch (estado)
         {
             case EstadoPrincipal.Patrullando:
