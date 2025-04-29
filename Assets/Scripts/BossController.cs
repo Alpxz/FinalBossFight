@@ -1,7 +1,8 @@
 using UnityEngine;
+using UnityEngine.AI;
 using System.Collections;
 
-public class BossAI : MonoBehaviour
+public class BossAI_NavMesh : MonoBehaviour
 {
     enum EstadoPrincipal { Patrullando, Alerta }
     enum SubEstadoAlerta { Ninguno, AtaqueBasico, AtaqueArea, AtaquePerseguir }
@@ -12,9 +13,9 @@ public class BossAI : MonoBehaviour
     public Transform[] puntosPatrulla;
     private int indicePatrulla = 0;
     public Transform jugador;
-    public float rangoDeteccion = 100f;
-    public float rangoAtaqueBasico = 30f;
-    public float rangoAtaqueArea = 50f;
+    public float rangoDeteccion = 10f;
+    public float rangoAtaqueBasico = 2f;
+    public float rangoAtaqueArea = 6f;
     public float velocidadPatrulla = 2f;
     public float velocidadPerseguir = 5f;
 
@@ -24,18 +25,24 @@ public class BossAI : MonoBehaviour
     private bool enPersecucionRapida = false;
 
     private Animator animator;
+    private NavMeshAgent agent;
 
-    // Variables para cooldown
+    // Cooldowns
     public float cooldownAtaqueBasico = 2f;
     public float cooldownAtaqueArea = 3f;
-    private float tiempoUltimoAtaqueBasico = -Mathf.Infinity;
-    private float tiempoUltimoAtaqueArea = -Mathf.Infinity;
+    private float tiempoUltimoAtaqueBasico = 0;
+    private float tiempoUltimoAtaqueArea = 0;
 
     void Start()
     {
         vidaActual = vidaMaxima;
         animator = GetComponent<Animator>();
+        agent = GetComponent<NavMeshAgent>();
+        jugador = GameObject.FindGameObjectWithTag("Player").transform;
+
         ActivarAnimacionPatrullar();
+        agent.speed = velocidadPatrulla;
+        agent.SetDestination(puntosPatrulla[indicePatrulla].position);
     }
 
     void Update()
@@ -59,12 +66,10 @@ public class BossAI : MonoBehaviour
 
     void Patrullar()
     {
-        Transform destino = puntosPatrulla[indicePatrulla];
-        MoverHacia(destino.position, velocidadPatrulla);
-
-        if (Vector3.Distance(transform.position, destino.position) < 0.5f)
+        if (!agent.pathPending && agent.remainingDistance < 0.5f)
         {
             indicePatrulla = (indicePatrulla + 1) % puntosPatrulla.Length;
+            agent.SetDestination(puntosPatrulla[indicePatrulla].position);
         }
     }
 
@@ -74,34 +79,35 @@ public class BossAI : MonoBehaviour
 
         if (enPersecucionRapida)
         {
-            MoverHacia(jugador.position, velocidadPerseguir);
-            RotarHacia(jugador.position);
+            agent.speed = velocidadPerseguir;
+            agent.SetDestination(jugador.position);
+           // RotarHacia(jugador.position);
             return;
         }
 
-        if (distancia <= rangoAtaqueBasico)
+        if (distancia <= rangoAtaqueBasico && subestado != SubEstadoAlerta.AtaqueBasico)//&& Time.time - tiempoUltimoAtaqueBasico >= cooldownAtaqueBasico
         {
-            if (subestado != SubEstadoAlerta.AtaqueBasico)
-            {
+           
                 subestado = SubEstadoAlerta.AtaqueBasico;
-                ActivarAnimacionAtaqueBasico();
-            }
+               // ActivarAnimacionAtaqueBasico();
+            
+            //DetenerMovimiento();
             AtaqueBasico();
         }
-        else if (distancia <= rangoAtaqueArea)
+        else if (distancia <= rangoAtaqueArea && subestado != SubEstadoAlerta.AtaqueArea) //&& Time.time - tiempoUltimoAtaqueArea >= cooldownAtaqueArea
         {
-            if (subestado != SubEstadoAlerta.AtaqueArea)
-            {
+            
                 subestado = SubEstadoAlerta.AtaqueArea;
-                ActivarAnimacionAtaqueArea();
-            }
+                //ActivarAnimacionAtaqueArea();
+            
+            //DetenerMovimiento();
             AtaqueArea();
         }
         else
         {
-            // Sigue persiguiendo normal
-            MoverHacia(jugador.position, velocidadPatrulla);
-            RotarHacia(jugador.position);
+            agent.speed = velocidadPatrulla;
+            agent.SetDestination(jugador.position);
+            //RotarHacia(jugador.position);
 
             if (subestado != SubEstadoAlerta.Ninguno)
             {
@@ -111,13 +117,18 @@ public class BossAI : MonoBehaviour
         }
     }
 
+    void DetenerMovimiento()
+    {
+        agent.ResetPath();
+    }
+
     void AtaqueBasico()
     {
         if (Time.time - tiempoUltimoAtaqueBasico >= cooldownAtaqueBasico)
         {
             Debug.Log("Boss hace Ataque Básico");
             tiempoUltimoAtaqueBasico = Time.time;
-            animator.SetTrigger("AtaqueBasico"); // Reafirmar trigger cada ataque
+            animator.SetTrigger("AtaqueBasico");
         }
     }
 
@@ -127,30 +138,19 @@ public class BossAI : MonoBehaviour
         {
             Debug.Log("Boss hace Ataque de Área");
             tiempoUltimoAtaqueArea = Time.time;
-            animator.SetTrigger("AtaqueArea"); // Reafirmar trigger cada ataque
+            animator.SetTrigger("AtaqueArea");
         }
-    }
-
-    void MoverHacia(Vector3 destino, float velocidad)
-    {
-        transform.position = Vector3.MoveTowards(transform.position, destino, velocidad * Time.deltaTime);
     }
 
     void RotarHacia(Vector3 objetivo)
     {
         Vector3 direccion = (objetivo - transform.position).normalized;
-        direccion.y = 0; // Evitar que rote en eje Y
+        direccion.y = 0;
         if (direccion != Vector3.zero)
         {
             Quaternion rotacionDeseada = Quaternion.LookRotation(direccion);
-            transform.rotation = Quaternion.Slerp(transform.rotation, rotacionDeseada, Time.deltaTime * 5f); // 5f = velocidad de giro
+            transform.rotation = Quaternion.Slerp(transform.rotation, rotacionDeseada, Time.deltaTime * 5f);
         }
-    }
-
-    void PerseguirRapido()
-    {
-        MoverHacia(jugador.position, velocidadPerseguir);
-        RotarHacia(jugador.position);
     }
 
     public void RecibirDaño(float daño)
@@ -170,12 +170,14 @@ public class BossAI : MonoBehaviour
         ActivarAnimacionPerseguirRapido();
 
         Debug.Log("¡Persecución rápida activada!");
+        agent.speed = velocidadPerseguir;
 
         yield return new WaitForSeconds(5f);
 
         enPersecucionRapida = false;
         subestado = SubEstadoAlerta.Ninguno;
         ActivarAnimacionSeguir();
+        agent.speed = velocidadPatrulla;
 
         Debug.Log("Persecución rápida terminada");
     }
@@ -187,12 +189,13 @@ public class BossAI : MonoBehaviour
             enPersecucionRapida = false;
             subestado = SubEstadoAlerta.Ninguno;
             ActivarAnimacionSeguir();
+            agent.speed = velocidadPatrulla;
 
             Debug.Log("Boss golpeó al jugador y terminó la persecución rápida.");
         }
     }
 
-    // Funciones de animación
+    // Animaciones
     void ActivarAnimacionPatrullar()
     {
         animator.ResetTrigger("AtaqueBasico");
@@ -211,14 +214,14 @@ public class BossAI : MonoBehaviour
 
     void ActivarAnimacionAtaqueBasico()
     {
-        
+       
         animator.ResetTrigger("Walk");
         animator.SetTrigger("AtaqueBasico");
     }
 
     void ActivarAnimacionAtaqueArea()
     {
-        animator.ResetTrigger("Walk");
+        
         animator.ResetTrigger("Walk");
         animator.SetTrigger("AtaqueArea");
     }
